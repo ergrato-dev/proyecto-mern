@@ -1,262 +1,266 @@
 # Esquema de Base de Datos — NN Auth System
 
 <!--
-  ¿Qué? Documentación del esquema relacional de la base de datos PostgreSQL.
+  ¿Qué? Documentación del esquema documental de MongoDB para el sistema NN Auth System.
   ¿Para qué? Que cualquier desarrollador entienda la estructura de datos del sistema
-             sin necesidad de leer los modelos ORM ni conectarse a la base de datos.
+             sin necesidad de leer los modelos Mongoose ni conectarse a la base de datos.
   ¿Impacto? El esquema es el contrato entre el backend y la base de datos.
-             Entender las relaciones, restricciones e índices es fundamental para
-             escribir queries eficientes y migraciones sin errores.
+             Entender las colecciones, campos, índices y relaciones es fundamental para
+             escribir queries eficientes y modelos Mongoose correctos.
 -->
 
-> **Motor**: PostgreSQL 17+
-> **ORM**: SQLAlchemy 2.0 con tipos declarativos (Mapped + mapped_column)
-> **Migraciones**: Alembic — nunca se modifica la BD manualmente
+> **Motor**: MongoDB 7 (Docker en desarrollo)
+> **ODM**: Mongoose 8 — Object Document Mapper para Node.js
+> **Migraciones**: No existen en MongoDB — los cambios de esquema se gestionan
+> con estrategias de evolución de documentos (backward-compatible fields)
 
 ---
 
 ## Diagrama Entidad-Relación (ER)
 
 ```
-┌─────────────────────────────────────────┐
-│                  users                  │
-├─────────────────────────────────────────┤
-│ PK  id               UUID               │
-│     email            VARCHAR(255) UNIQUE│
-│     full_name        VARCHAR(255)       │
-│     hashed_password  VARCHAR(255)       │
-│     is_active        BOOLEAN  = true    │
-│     is_email_verified BOOLEAN = false   │
-│     created_at       TIMESTAMPTZ        │
-│     updated_at       TIMESTAMPTZ        │
-└────────────────┬────────────────────────┘
-                 │ 1
-                 │
-       ┌─────────┴──────────┐
-       │ N                  │ N
-       ▼                    ▼
-┌────────────────────┐  ┌──────────────────────────┐
-│ password_reset_    │  │  email_verification_     │
-│ tokens             │  │  tokens                  │
-├────────────────────┤  ├──────────────────────────┤
-│PK id    UUID       │  │PK id    UUID             │
-│FK user_id → users  │  │FK user_id → users        │
-│   token  VARCHAR   │  │   token  VARCHAR         │
-│   expires_at TSTZ  │  │   expires_at TSTZ        │
-│   used   BOOLEAN   │  │   used   BOOLEAN         │
-│   created_at TSTZ  │  │   created_at TSTZ        │
-└────────────────────┘  └──────────────────────────┘
+┌──────────────────────────────────────────────┐
+│                    users                     │
+├──────────────────────────────────────────────┤
+│ PK  _id               ObjectId               │
+│     email             String  UNIQUE         │
+│     firstName         String                 │
+│     lastName          String                 │
+│     hashedPassword    String                 │
+│     isActive          Boolean = true         │
+│     isEmailVerified   Boolean = false        │
+│     locale            String  = "es"         │
+│     createdAt         Date  (auto)           │
+│     updatedAt         Date  (auto)           │
+└────────────────────┬─────────────────────────┘
+                     │ 1
+                     │
+                     │ N
+                     ▼
+┌──────────────────────────────────────────────┐
+│            passwordresettokens               │
+├──────────────────────────────────────────────┤
+│ PK  _id        ObjectId                      │
+│ FK  userId     ObjectId → users._id          │
+│     token      String  UNIQUE                │
+│     expiresAt  Date                          │
+│     used       Boolean = false               │
+│     createdAt  Date  (auto)                  │
+└──────────────────────────────────────────────┘
 ```
 
 **Relaciones**:
 
 - Un `User` puede tener **muchos** `PasswordResetToken` (uno por cada solicitud de recuperación)
-- Un `User` puede tener **muchos** `EmailVerificationToken` (uno por cada registro/reenvío)
-- Ambas tablas de tokens tienen `ondelete="CASCADE"` — si se elimina el usuario, sus tokens se borran automáticamente
+- `userId` es una referencia (`ref: 'User'`) — Mongoose puede popularlo con `.populate('userId')`
+- No hay foreign key enforcement en MongoDB — la integridad la garantiza el código en los services
+
+> **Nota pedagógica**: A diferencia de PostgreSQL, MongoDB no tiene relaciones declarativas
+> con `ON DELETE CASCADE`. Si se borra un usuario, hay que eliminar sus tokens manualmente
+> desde el service, o usar un middleware Mongoose `pre('deleteOne', ...)`.
 
 ---
 
-## Tabla: `users`
+## Colección: `users`
 
 Almacena los datos de todos los usuarios registrados en el sistema.
 
-```sql
-CREATE TABLE users (
-    id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    email               VARCHAR(255) NOT NULL UNIQUE,
-    full_name           VARCHAR(255) NOT NULL,
-    hashed_password     VARCHAR(255) NOT NULL,
-    is_active           BOOLEAN     NOT NULL DEFAULT TRUE,
-    is_email_verified   BOOLEAN     NOT NULL DEFAULT FALSE,
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+### Schema Mongoose (`be/src/models/User.ts`)
+
+```typescript
+const userSchema = new Schema<IUser>(
+  {
+    email:           { type: String, required: true, unique: true, lowercase: true, trim: true },
+    firstName:       { type: String, required: true, trim: true },
+    lastName:        { type: String, required: true, trim: true },
+    hashedPassword:  { type: String, required: true },
+    isActive:        { type: Boolean, default: true },
+    isEmailVerified: { type: Boolean, default: false },
+    locale:          { type: String, enum: ['es', 'en'], default: 'es' },
+  },
+  { timestamps: true },   // genera createdAt y updatedAt automáticamente
 );
 
-CREATE INDEX ix_users_email ON users (email);
+// Índice explícito para búsquedas por email (login frecuente)
+userSchema.index({ email: 1 }, { unique: true });
 ```
 
-### Columnas
+### Campos
 
-| Columna             | Tipo         | Nulo | Default | Descripción                                                   |
-| ------------------- | ------------ | ---- | ------- | ------------------------------------------------------------- |
-| `id`                | UUID         | No   | uuid4() | Identificador único — UUID evita predicción secuencial        |
-| `email`             | VARCHAR(255) | No   | —       | Credencial de login. UNIQUE + INDEX para búsquedas rápidas    |
-| `full_name`         | VARCHAR(255) | No   | —       | Nombre completo para mostrar en la interfaz                   |
-| `hashed_password`   | VARCHAR(255) | No   | —       | Hash bcrypt de la contraseña. **Nunca texto plano**           |
-| `is_active`         | BOOLEAN      | No   | `true`  | Permite desactivar cuentas sin borrar datos (soft delete)     |
-| `is_email_verified` | BOOLEAN      | No   | `false` | `false` al registrarse → no puede hacer login hasta verificar |
-| `created_at`        | TIMESTAMPTZ  | No   | `now()` | Fecha de registro del usuario (generada por PostgreSQL)       |
-| `updated_at`        | TIMESTAMPTZ  | No   | `now()` | Fecha de última modificación — se actualiza en cada UPDATE    |
+| Campo             | Tipo     | Requerido | Default  | Descripción                                                      |
+| ----------------- | -------- | --------- | -------- | ---------------------------------------------------------------- |
+| `_id`             | ObjectId | Auto      | —        | PK generada por MongoDB — 12 bytes, incluye timestamp            |
+| `email`           | String   | Sí        | —        | Credencial de login. `unique: true` + índice B-tree              |
+| `firstName`       | String   | Sí        | —        | Nombre para mostrar en la interfaz                               |
+| `lastName`        | String   | Sí        | —        | Apellido para mostrar en la interfaz                             |
+| `hashedPassword`  | String   | Sí        | —        | Hash bcrypt de la contraseña. **Nunca texto plano**              |
+| `isActive`        | Boolean  | No        | `true`   | Permite desactivar cuentas sin borrar datos (soft delete)        |
+| `isEmailVerified` | Boolean  | No        | `false`  | Reservado para futura verificación de email                      |
+| `locale`          | String   | No        | `"es"`   | Preferencia de idioma del usuario: `"es"` o `"en"`               |
+| `createdAt`       | Date     | Auto      | `now()`  | Generado por `{ timestamps: true }` en Mongoose                  |
+| `updatedAt`       | Date     | Auto      | `now()`  | Actualizado automáticamente en cada `save()`                     |
 
 ### Índices
 
-| Índice           | Columna | Tipo   | Razón                                                  |
-| ---------------- | ------- | ------ | ------------------------------------------------------ |
-| `pk_users`       | `id`    | PK     | Búsquedas por ID (relaciones con tokens)               |
-| `ix_users_email` | `email` | UNIQUE | Login frecuente por email — O(log n) con índice B-tree |
+| Índice               | Campo   | Tipo   | Razón                                                  |
+| -------------------- | ------- | ------ | ------------------------------------------------------ |
+| `_id_` (default)     | `_id`   | PK     | Búsquedas por ID (joins manuales con tokens)           |
+| `email_1` (unique)   | `email` | UNIQUE | Login frecuente por email — O(log n) con índice B-tree |
 
 ### Notas de seguridad
 
-- `hashed_password` almacena el hash bcrypt (formato `$2b$12$...`) — ~60 caracteres estándar, 255 como margen futuro.
-- `is_email_verified` implementa verificación de email obligatoria — los nuevos usuarios no pueden autenticarse hasta confirmar su email (OWASP A07).
-- `is_active` permite bloquear cuentas sospechosas sin perder datos históricos.
+- `hashedPassword` almacena el hash bcrypt (formato `$2b$12$...`) — nunca se devuelve en las responses.
+  Excluir explícitamente con `select: false` o en el service con `.select('-hashedPassword')`.
+- `isActive` permite bloquear cuentas sospechosas sin perder datos históricos.
+- `locale` solo acepta `"es"` o `"en"` — Mongoose valida con `enum` y rechaza cualquier otro valor.
 
 ---
 
-## Tabla: `password_reset_tokens`
+## Colección: `passwordresettokens`
 
 Almacena tokens temporales para el flujo de recuperación de contraseña.
 
-```sql
-CREATE TABLE password_reset_tokens (
-    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token       VARCHAR(255) NOT NULL UNIQUE,
-    expires_at  TIMESTAMPTZ NOT NULL,
-    used        BOOLEAN     NOT NULL DEFAULT FALSE,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+> **Nombre de la colección**: Mongoose pluraliza automáticamente el modelo `PasswordResetToken`
+> a `passwordresettokens` (todo en minúsculas). Verificar con `mongoose.modelNames()`.
+
+### Schema Mongoose (`be/src/models/PasswordResetToken.ts`)
+
+```typescript
+const passwordResetTokenSchema = new Schema<IPasswordResetToken>(
+  {
+    userId:    { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    token:     { type: String, required: true, unique: true },
+    expiresAt: { type: Date, required: true },
+    used:      { type: Boolean, default: false },
+  },
+  { timestamps: true },
 );
 
-CREATE INDEX ix_password_reset_tokens_token ON password_reset_tokens (token);
+passwordResetTokenSchema.index({ token: 1 }, { unique: true });
 ```
 
-### Columnas
+### Campos
 
-| Columna      | Tipo         | Nulo | Default | Descripción                                                |
-| ------------ | ------------ | ---- | ------- | ---------------------------------------------------------- |
-| `id`         | UUID         | No   | uuid4() | Identificador único del registro de token                  |
-| `user_id`    | UUID         | No   | —       | FK → `users.id`. CASCADE: si borra el user, borra el token |
-| `token`      | VARCHAR(255) | No   | —       | UUID aleatorio enviado en el email de recuperación         |
-| `expires_at` | TIMESTAMPTZ  | No   | —       | Expiración: **1 hora** desde la creación                   |
-| `used`       | BOOLEAN      | No   | `false` | `true` una vez utilizado — previene reúso del enlace       |
-| `created_at` | TIMESTAMPTZ  | No   | `now()` | Fecha de emisión del token                                 |
+| Campo       | Tipo     | Requerido | Default  | Descripción                                                    |
+| ----------- | -------- | --------- | -------- | -------------------------------------------------------------- |
+| `_id`       | ObjectId | Auto      | —        | PK generada por MongoDB                                        |
+| `userId`    | ObjectId | Sí        | —        | Referencia a `users._id`. No hay CASCADE — se borra en service |
+| `token`     | String   | Sí        | —        | Token UUID aleatorio enviado en el email de recuperación       |
+| `expiresAt` | Date     | Sí        | —        | Expiración: **1 hora** desde la creación                       |
+| `used`      | Boolean  | No        | `false`  | `true` una vez utilizado — previene reúso del enlace           |
+| `createdAt` | Date     | Auto      | `now()`  | Generado por `{ timestamps: true }`                            |
 
 ### Índices
 
-| Índice                           | Columna | Tipo   | Razón                                           |
-| -------------------------------- | ------- | ------ | ----------------------------------------------- |
-| `pk_password_reset_tokens`       | `id`    | PK     | —                                               |
-| `ix_password_reset_tokens_token` | `token` | UNIQUE | Reset password busca por token — requiere INDEX |
+| Índice             | Campo    | Tipo   | Razón                                            |
+| ------------------ | -------- | ------ | ------------------------------------------------ |
+| `_id_` (default)   | `_id`    | PK     | —                                                |
+| `token_1` (unique) | `token`  | UNIQUE | Reset password busca por token — requiere índice |
+| `userId_1`         | `userId` | Normal | Buscar todos los tokens de un usuario            |
 
 ### Ciclo de vida de un token de reset
 
 ```
-1. Usuario solicita reset → se crea registro (used=false, expires_at = now + 1h)
-2. Usuario hace clic en el enlace → backend valida token:
+1. Usuario solicita reset → service crea documento (used: false, expiresAt: now + 1h)
+2. Se envía email con enlace: {FRONTEND_URL}/reset-password?token=<uuid>
+3. Usuario hace clic → backend ejecuta PasswordResetToken.findOne({ token }):
    - ¿Existe? → OK
-   - ¿expires_at > now()? → OK (no expirado)
-   - ¿used == false? → OK (no reutilizado)
-3. Se actualiza contraseña + se marca used=true
-4. Cualquier intento posterior con el mismo token → rechazado (400)
+   - ¿expiresAt > new Date()? → OK (no expirado)
+   - ¿used === false? → OK (no reutilizado)
+4. Se actualiza User.hashedPassword + se marca token.used = true
+5. Cualquier intento posterior con el mismo token → rechazado (400)
 ```
 
 ---
 
-## Tabla: `email_verification_tokens`
+## Convenciones de Nomenclatura en MongoDB/Mongoose
 
-Almacena tokens temporales para el flujo de verificación de email al registrarse.
+| Aspecto              | Convención                | Ejemplo                                      |
+| -------------------- | ------------------------- | -------------------------------------------- |
+| Colecciones          | `camelCase`, plural       | `users`, `passwordresettokens`               |
+| Campos               | `camelCase`               | `hashedPassword`, `createdAt`, `firstName`   |
+| Primary Keys         | `_id` (ObjectId)          | `_id: ObjectId("507f1f77bcf86cd799439011")`  |
+| Foreign Keys / Refs  | `<entidad>Id`             | `userId: ObjectId` con `ref: 'User'`         |
+| Timestamps           | `createdAt` / `updatedAt` | Generados por `{ timestamps: true }`         |
+| Nombres de modelos   | `PascalCase`, singular    | `User`, `PasswordResetToken`                 |
 
-```sql
-CREATE TABLE email_verification_tokens (
-    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token       VARCHAR(255) NOT NULL UNIQUE,
-    expires_at  TIMESTAMPTZ NOT NULL,
-    used        BOOLEAN     NOT NULL DEFAULT FALSE,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+---
 
-CREATE INDEX ix_email_verification_tokens_token ON email_verification_tokens (token);
-```
+## ¿Por qué ObjectId y no UUID?
 
-### Columnas
-
-| Columna      | Tipo         | Nulo | Default | Descripción                                                |
-| ------------ | ------------ | ---- | ------- | ---------------------------------------------------------- |
-| `id`         | UUID         | No   | uuid4() | Identificador único del registro de token                  |
-| `user_id`    | UUID         | No   | —       | FK → `users.id`. CASCADE: si borra el user, borra el token |
-| `token`      | VARCHAR(255) | No   | —       | UUID aleatorio enviado en el email de verificación         |
-| `expires_at` | TIMESTAMPTZ  | No   | —       | Expiración: **24 horas** desde la creación                 |
-| `used`       | BOOLEAN      | No   | `false` | `true` una vez utilizado — previene reúso del enlace       |
-| `created_at` | TIMESTAMPTZ  | No   | `now()` | Fecha de emisión del token                                 |
-
-### Ciclo de vida de un token de verificación
+MongoDB genera automáticamente un `_id` de tipo **ObjectId** (12 bytes):
 
 ```
-1. Usuario se registra → se crea User(is_email_verified=false) + EmailVerificationToken
-2. Se envía email con enlace: /verify-email?token=<uuid>
-3. Usuario hace clic → backend valida token:
-   - ¿Existe? → OK
-   - ¿expires_at > now()? → OK (no expirado — válido 24h)
-   - ¿used == false? → OK
-4. Se actualiza User.is_email_verified = true + se marca token used=true
-5. Usuario ya puede hacer login
+ObjectId("507f1f77bcf86cd799439011")
+        └──────────────────────────┘
+         4 bytes timestamp + 5 bytes random + 3 bytes counter
+```
+
+**Ventajas del ObjectId vs Integer autoincremental:**
+
+- **No predecible**: No se pueden adivinar IDs de otros usuarios
+- **Timestamp integrado**: `_id.getTimestamp()` devuelve la fecha de creación sin campo extra
+- **Distribuido**: Se puede generar en el cliente sin coordinación con el servidor
+
+**vs UUID v4**: ObjectId es más compacto (12 vs 16 bytes) y lleva timestamp integrado.
+Para este proyecto, ObjectId es la elección natural de MongoDB.
+
+---
+
+## Evolución de Esquemas (sin migraciones)
+
+> **Nota pedagógica**: MongoDB es schemaless — no existen migraciones como en PostgreSQL/Alembic.
+> Mongoose añade validación a nivel de aplicación, pero la BD acepta cualquier documento.
+
+Estrategias para cambios de esquema en producción:
+
+```
+1. Agregar campo opcional (backward-compatible):
+   - Añadir el campo en el schema Mongoose con un default
+   - Los documentos viejos usan el default; los nuevos tienen el valor real
+   - No se necesita tocar los documentos existentes
+
+2. Renombrar campo:
+   - Script de migración: db.users.updateMany({}, { $rename: { oldField: 'newField' } })
+
+3. Cambiar tipo de campo:
+   - Requiere script de migración explícito en ventana de mantenimiento
+
+Ejemplo:
+   cd be && node scripts/migrate-add-locale.js
 ```
 
 ---
 
-## Migraciones con Alembic
+## Ejemplos de Documentos en MongoDB
 
-El historial de migraciones vive en `be/alembic/versions/`. **Nunca se modifica la BD directamente** — todo cambio va a través de Alembic.
+### Colección `users`
 
-```bash
-# Ver estado actual de las migraciones
-cd be && alembic current
-
-# Ver historial de migraciones
-alembic history --verbose
-
-# Aplicar todas las migraciones pendientes
-alembic upgrade head
-
-# Revertir la última migración (solo en desarrollo)
-alembic downgrade -1
-
-# Crear nueva migración (detecta cambios en los modelos automáticamente)
-alembic revision --autogenerate -m "descripcion del cambio"
+```json
+{
+  "_id": "507f1f77bcf86cd799439011",
+  "email": "carlos.garcia@ejemplo.com",
+  "firstName": "Carlos",
+  "lastName": "García",
+  "hashedPassword": "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
+  "isActive": true,
+  "isEmailVerified": false,
+  "locale": "es",
+  "createdAt": "2026-04-22T10:00:00.000Z",
+  "updatedAt": "2026-04-22T10:00:00.000Z"
+}
 ```
 
-### Migraciones existentes
+### Colección `passwordresettokens`
 
-| Revisión     | Descripción                                   |
-| ------------ | --------------------------------------------- |
-| `a7c03fd8`   | Create users and password_reset_tokens tables |
-| `c3d5e7f9` ¹ | Add email_verification_tokens table           |
-
-> ¹ El hash exacto puede variar según la instalación — verificar con `alembic history`.
-
----
-
-## Convenciones de Nomenclatura en la BD
-
-| Aspecto          | Convención                  | Ejemplo                               |
-| ---------------- | --------------------------- | ------------------------------------- |
-| Tablas           | `snake_case`, plural        | `users`, `password_reset_tokens`      |
-| Columnas         | `snake_case`                | `hashed_password`, `created_at`       |
-| Primary Keys     | `id` con tipo UUID          | `id UUID PK`                          |
-| Foreign Keys     | `<tabla_singular>_id`       | `user_id` → `users.id`                |
-| Timestamps       | `created_at` / `updated_at` | Todas las tablas tienen `created_at`  |
-| Índices          | `ix_<tabla>_<columna>`      | `ix_users_email`                      |
-| Primary Key Name | `pk_<tabla>`                | PostgreSQL los genera automáticamente |
-
----
-
-## ¿Por qué UUID como Primary Key?
-
-En lugar de integers autoincrementales (1, 2, 3...), este proyecto usa **UUID v4** como PK:
-
+```json
+{
+  "_id": "60c72b2f9b1d4c0015a1f3e2",
+  "userId": "507f1f77bcf86cd799439011",
+  "token": "a3f8c2d1-7e4b-4f9a-b2c6-1d3e5f7a9b0c",
+  "expiresAt": "2026-04-22T11:00:00.000Z",
+  "used": false,
+  "createdAt": "2026-04-22T10:00:00.000Z",
+  "updatedAt": "2026-04-22T10:00:00.000Z"
+}
 ```
-# UUID v4 — completamente aleatorio:
-550e8400-e29b-41d4-a716-446655440000
-
-# vs Integer autoincremental:
-1, 2, 3, 4...
-```
-
-**Ventajas del UUID:**
-
-- **Seguridad**: No revela cuántos usuarios hay (`/users/1000` expone que hay al menos 1000 usuarios)
-- **No predecible**: No se pueden adivinar IDs de otros usuarios para intentar accesos
-- **Distribuido**: Permite generar IDs sin coordinación central (útil en arquitecturas multi-servicio)
-
-**Desventaja**: Los UUIDs son más grandes (16 bytes vs 4 bytes de int) — impacto mínimo en este proyecto educativo.

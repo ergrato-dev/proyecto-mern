@@ -22,14 +22,15 @@ Este color no es decorativo: es **semiótico**. Verde = Python; Azul = Node.js; 
 
 ## 2. Tabla de Identidades Visuales
 
-| Stack backend               | Proyecto              | Color Tailwind | Hex referencia |
-| --------------------------- | --------------------- | -------------- | -------------- |
-| **FastAPI (Python)** ← ESTE | `proyecto-be-fe`      | `emerald`      | `#059669`      |
-| Express.js (Node)           | `proyecto-beex-fe`    | `blue`         | `#2563eb`      |
-| Next.js fullstack           | `proyecto-be-fe-next` | `violet`       | `#7c3aed`      |
-| Spring Boot Java            | `proyecto-besb-fe`    | `amber`        | `#d97706`      |
-| Spring Boot Kotlin          | `proyecto-besbk-fe`   | `fuchsia`      | `#c026d3`      |
-| Go REST API                 | `proyecto-bego-fe`    | `cyan`         | `#0891b2`      |
+| Stack backend                        | Proyecto              | Color Tailwind | Hex referencia |
+| ------------------------------------ | --------------------- | -------------- | -------------- |
+| FastAPI (Python)                     | `proyecto-be-fe`      | `emerald`      | `#059669`      |
+| Express.js (Node)                    | `proyecto-beex-fe`    | `blue`         | `#2563eb`      |
+| **MERN (MongoDB + Express)** ← ESTE  | `proyecto-mern`       | `orange`       | `#ea580c`      |
+| Next.js fullstack                    | `proyecto-be-fe-next` | `violet`       | `#7c3aed`      |
+| Spring Boot Java                     | `proyecto-besb-fe`    | `amber`        | `#d97706`      |
+| Spring Boot Kotlin                   | `proyecto-besbk-fe`   | `fuchsia`      | `#c026d3`      |
+| Go REST API                          | `proyecto-bego-fe`    | `cyan`         | `#0891b2`      |
 
 ---
 
@@ -64,19 +65,20 @@ La directiva `@theme inline` crea aliases que las referencian:
 
 ```css
 /* fe/src/index.css */
+/* MERN (MongoDB + Express) ← ESTE — acento: orange */
 
 @theme inline {
-  --color-accent-50: var(--color-emerald-50);
-  --color-accent-100: var(--color-emerald-100);
-  --color-accent-200: var(--color-emerald-200);
-  --color-accent-300: var(--color-emerald-300);
-  --color-accent-400: var(--color-emerald-400);
-  --color-accent-500: var(--color-emerald-500); /* ← color base de acento */
-  --color-accent-600: var(--color-emerald-600); /* ← botones primarios */
-  --color-accent-700: var(--color-emerald-700); /* ← hover de botones */
-  --color-accent-800: var(--color-emerald-800);
-  --color-accent-900: var(--color-emerald-900);
-  --color-accent-950: var(--color-emerald-950);
+  --color-accent-50: var(--color-orange-50);
+  --color-accent-100: var(--color-orange-100);
+  --color-accent-200: var(--color-orange-200);
+  --color-accent-300: var(--color-orange-300);
+  --color-accent-400: var(--color-orange-400);
+  --color-accent-500: var(--color-orange-500); /* ← color base de acento */
+  --color-accent-600: var(--color-orange-600); /* ← botones primarios */
+  --color-accent-700: var(--color-orange-700); /* ← hover de botones */
+  --color-accent-800: var(--color-orange-800);
+  --color-accent-900: var(--color-orange-900);
+  --color-accent-950: var(--color-orange-950);
 }
 ```
 
@@ -119,10 +121,10 @@ color de acento de un proyecto concreto.
 El componente `NNAuthLogo` en `LandingPage.tsx` usa valores SVG directos, no clases
 Tailwind. Al cambiar el stack, actualizar también estos colores:
 
-| Token semántico | FastAPI (emerald)  | Express (blue)     | Go (cyan)          |
-| --------------- | ------------------ | ------------------ | ------------------ |
-| Borde del badge | `stroke="#059669"` | `stroke="#2563eb"` | `stroke="#0891b2"` |
-| Trazos letras N | `stroke="#34d399"` | `stroke="#60a5fa"` | `stroke="#22d3ee"` |
+| Token semántico | FastAPI (emerald)  | Express (blue)     | MERN (orange)      | Go (cyan)          |
+| --------------- | ------------------ | ------------------ | ------------------ | ------------------ |
+| Borde del badge | `stroke="#059669"` | `stroke="#2563eb"` | `stroke="#ea580c"` | `stroke="#0891b2"` |
+| Trazos letras N | `stroke="#34d399"` | `stroke="#60a5fa"` | `stroke="#fb923c"` | `stroke="#22d3ee"` |
 
 La relación es: borde = `{paleta}-600`, trazos = `{paleta}-400`.
 
@@ -135,11 +137,11 @@ La relación es: borde = `{paleta}-600`, trazos = `{paleta}-400`.
 Editar únicamente el bloque `@theme inline` en `fe/src/index.css`:
 
 ```css
-/* Ejemplo: cambiar de FastAPI (emerald) a Express.js (blue) */
+/* Ejemplo: cambiar de MERN (orange) a Express.js (blue) */
 
 @theme inline {
-  /* Antes: var(--color-emerald-*)  */
-  /* Después:                       */
+  /* Antes: var(--color-orange-*)  */
+  /* Después:                      */
   --color-accent-50: var(--color-blue-50);
   --color-accent-100: var(--color-blue-100);
   --color-accent-200: var(--color-blue-200);
@@ -165,8 +167,8 @@ Cambiar la línea `/* FastAPI (Python) ← ESTE */` para identificar el nuevo st
 
 ### Paso 4 _(opcional)_ — Actualizar el `tech stack` en `LandingPage.tsx`
 
-El array `techStack` lista las tecnologías del proyecto. Reemplazar `"Python 3.12"`,
-`"FastAPI"`, `"SQLAlchemy"`, `"Alembic"`, `"Pydantic"`, `"pytest"` por las del nuevo stack.
+El array `techStack` lista las tecnologías del proyecto. Reemplazar `"Node.js 20"`,
+`"Express.js"`, `"MongoDB"`, `"Mongoose"`, `"TypeScript"`, `"Jest"` por las del nuevo stack.
 
 ---
 
@@ -246,11 +248,12 @@ hardcodeados que deben migrarse a `accent-*`.
 
 ## 9. Relación con el Repositorio de Referencia
 
-El repositorio `ergrato-dev/proyecto-beex-fe` (Express.js) implementa el mismo
-sistema con `blue` como acento. Es el proyecto de referencia para comparar la
+El repositorio `ergrato-dev/proyecto-be-fe` (FastAPI + Python) implementa el mismo
+sistema con `emerald` como acento. Es el proyecto de referencia para comparar la
 misma arquitectura con distinto stack y distinto color de identidad.
 
-| Repositorio        | Stack             | Acento  | URL                                       |
-| ------------------ | ----------------- | ------- | ----------------------------------------- |
-| `proyecto-be-fe`   | FastAPI + Python  | emerald | _(este repo)_                             |
-| `proyecto-beex-fe` | Express.js + Node | blue    | `github.com/ergrato-dev/proyecto-beex-fe` |
+| Repositorio        | Stack                    | Acento  | URL                                        |
+| ------------------ | ------------------------ | ------- | ------------------------------------------ |
+| `proyecto-mern`    | MERN (MongoDB + Express) | orange  | _(este repo)_                              |
+| `proyecto-be-fe`   | FastAPI + Python         | emerald | `github.com/ergrato-dev/proyecto-be-fe`    |
+| `proyecto-beex-fe` | Express.js + Node        | blue    | `github.com/ergrato-dev/proyecto-beex-fe`  |
