@@ -3,13 +3,12 @@
 <!--
   ¿Qué? Documentación de referencia de todos los endpoints de la API REST del backend.
   ¿Para qué? Que cualquier desarrollador (frontend, backend, QA) pueda integrar o probar
-             la API sin necesidad de leer el código fuente ni acceder a Swagger UI.
-  ¿Impacto? En producción, Swagger UI (/docs) está deshabilitado por seguridad
-             (OWASP A05 — Security Misconfiguration). Este documento es la única
-             referencia pública de la API para entornos de producción.
+             la API sin necesidad de leer el código fuente.
+  ¿Impacto? Express.js no genera documentación automática — este archivo es la única
+             referencia de la API para todo el equipo.
 -->
 
-> **Base URL**: `http://localhost:8000`
+> **Base URL**: `http://localhost:5000`
 > **Versionamiento**: Todos los endpoints usan el prefijo `/api/v1/`
 > **Formato**: JSON en request y response (Content-Type: `application/json`)
 > **Autenticación**: JWT Bearer Token — `Authorization: Bearer <access_token>`
@@ -26,10 +25,9 @@
 | POST   | `/api/v1/auth/change-password` | Cambiar contraseña (usuario autenticado) | Sí   | —          |
 | POST   | `/api/v1/auth/forgot-password` | Solicitar email de recuperación          | No   | 5/min      |
 | POST   | `/api/v1/auth/reset-password`  | Restablecer contraseña con token         | No † | —          |
-| POST   | `/api/v1/auth/verify-email`    | Verificar dirección de email             | No † | —          |
 | GET    | `/api/v1/users/me`             | Obtener perfil del usuario actual        | Sí   | —          |
 
-> **†** No requiere `Authorization` header, pero sí un token específico en el body (refresh token, reset token o verification token).
+> **†** No requiere `Authorization` header, pero sí un token específico en el body (refresh token o reset token).
 
 ---
 
@@ -39,10 +37,8 @@
 | ------ | ------------------------------------------------------------------- |
 | 200    | OK — Operación exitosa                                              |
 | 201    | Created — Recurso creado exitosamente (registro de usuario)         |
-| 400    | Bad Request — Datos inválidos (email duplicado, lógica de negocio)  |
+| 400    | Bad Request — Datos inválidos (email duplicado, validación fallida) |
 | 401    | Unauthorized — Token inválido, expirado o ausente                   |
-| 403    | Forbidden — Autenticado pero sin permiso (email no verificado)      |
-| 422    | Unprocessable Entity — Validación Pydantic fallida (tipos, formato) |
 | 429    | Too Many Requests — Rate limit superado                             |
 | 500    | Internal Server Error — Error no controlado del servidor            |
 
@@ -61,40 +57,42 @@ Registra un nuevo usuario en el sistema y envía un email de verificación.
 ```json
 {
   "email": "usuario@ejemplo.com",
-  "full_name": "Juan Pérez",
+  "firstName": "Juan",
+  "lastName": "Pérez",
   "password": "MiContrasena1"
 }
 ```
 
 | Campo       | Tipo   | Requerido | Validación                                   |
 | ----------- | ------ | --------- | -------------------------------------------- |
-| `email`     | string | Sí        | Formato email válido (`EmailStr`)            |
-| `full_name` | string | Sí        | Mínimo 1 caracter (sin espacios en blanco)   |
+| `email`     | string | Sí        | Formato email válido                          |
+| `firstName` | string | Sí        | Mínimo 1 caracter (sin espacios en blanco)   |
+| `lastName`  | string | Sí        | Mínimo 1 caracter (sin espacios en blanco)   |
 | `password`  | string | Sí        | ≥8 chars, 1 mayúscula, 1 minúscula, 1 número |
 
 **Respuesta exitosa (201 Created):**
 
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "_id": "507f1f77bcf86cd799439011",
   "email": "usuario@ejemplo.com",
-  "full_name": "Juan Pérez",
-  "is_active": true,
-  "is_email_verified": false,
-  "created_at": "2026-02-15T10:30:00+00:00",
-  "updated_at": "2026-02-15T10:30:00+00:00"
+  "firstName": "Juan",
+  "lastName": "Pérez",
+  "isActive": true,
+  "isEmailVerified": false,
+  "locale": "es",
+  "createdAt": "2026-04-22T10:30:00.000Z",
+  "updatedAt": "2026-04-22T10:30:00.000Z"
 }
 ```
 
-> ⚠️ El usuario queda con `is_email_verified: false`. No puede hacer login hasta verificar su email.
-
 **Errores posibles:**
 
-| Código | Condición                                 |
-| ------ | ----------------------------------------- |
-| 400    | Email ya registrado en el sistema         |
-| 422    | Validación fallida (password débil, etc.) |
-| 429    | Rate limit superado (5/min)               |
+| Código | Condición                             |
+| ------ | ------------------------------------- |
+| 400    | Email ya registrado en el sistema     |
+| 400    | Validación fallida (password débil)   |
+| 429    | Rate limit superado (5/min)           |
 
 ---
 
@@ -147,7 +145,6 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 | Código | Condición                                   |
 | ------ | ------------------------------------------- |
 | 401    | Email no registrado o contraseña incorrecta |
-| 403    | Cuenta creada pero email no verificado aún  |
 | 429    | Rate limit superado (10/min)                |
 
 > **Nota de seguridad**: La API devuelve el mismo `401` tanto si el email no existe como si la contraseña es incorrecta. Esto evita la **enumeración de usuarios** — un atacante no puede saber si un email está registrado.
@@ -205,15 +202,15 @@ Cambia la contraseña del usuario autenticado, verificando primero la contraseñ
 
 ```json
 {
-  "current_password": "MiContrasenaActual1",
-  "new_password": "MiNuevaContrasena1"
+  "currentPassword": "MiContrasenaActual1",
+  "newPassword": "MiNuevaContrasena1"
 }
 ```
 
-| Campo              | Tipo   | Validación                                   |
-| ------------------ | ------ | -------------------------------------------- |
-| `current_password` | string | Contraseña actual correcta                   |
-| `new_password`     | string | ≥8 chars, 1 mayúscula, 1 minúscula, 1 número |
+| Campo             | Tipo   | Validación                                   |
+| ----------------- | ------ | -------------------------------------------- |
+| `currentPassword` | string | Contraseña actual correcta                   |
+| `newPassword`     | string | ≥8 chars, 1 mayúscula, 1 minúscula, 1 número |
 
 **Respuesta exitosa (200 OK):**
 
@@ -228,8 +225,8 @@ Cambia la contraseña del usuario autenticado, verificando primero la contraseñ
 | Código | Condición                                          |
 | ------ | -------------------------------------------------- |
 | 400    | La contraseña actual no es correcta                |
+| 400    | Nueva contraseña no cumple requisitos de fortaleza |
 | 401    | Token ausente, inválido o expirado                 |
-| 422    | Nueva contraseña no cumple requisitos de fortaleza |
 
 ---
 
@@ -260,7 +257,7 @@ Solicita el envío de un email con enlace de recuperación de contraseña.
 El enlace enviado al email tiene este formato:
 
 ```
-{FRONTEND_URL}/reset-password?token=<uuid-token>
+{FRONTEND_URL}/reset-password?token=<reset-token>
 ```
 
 El token expira en **1 hora**.
@@ -269,7 +266,7 @@ El token expira en **1 hora**.
 
 | Código | Condición                   |
 | ------ | --------------------------- |
-| 422    | Email con formato inválido  |
+| 400    | Email con formato inválido  |
 | 429    | Rate limit superado (5/min) |
 
 ---
@@ -282,15 +279,15 @@ Restablece la contraseña usando el token recibido por email.
 
 ```json
 {
-  "token": "550e8400-e29b-41d4-a716-446655440000",
-  "new_password": "MiNuevaContrasena1"
+  "token": "507f191e810c19729de860ea",
+  "newPassword": "MiNuevaContrasena1"
 }
 ```
 
-| Campo          | Tipo   | Descripción                           |
-| -------------- | ------ | ------------------------------------- |
-| `token`        | string | Token UUID del email de recuperación  |
-| `new_password` | string | ≥8 chars, 1 mayúscula, 1 min., 1 núm. |
+| Campo         | Tipo   | Descripción                                |
+| ------------- | ------ | ------------------------------------------ |
+| `token`       | string | Token del email de recuperación            |
+| `newPassword` | string | ≥8 chars, 1 mayúscula, 1 minúscula, 1 núm. |
 
 **Respuesta exitosa (200 OK):**
 
@@ -305,45 +302,7 @@ Restablece la contraseña usando el token recibido por email.
 | Código | Condición                                          |
 | ------ | -------------------------------------------------- |
 | 400    | Token inválido, expirado o ya usado                |
-| 422    | Nueva contraseña no cumple requisitos de fortaleza |
-
----
-
-### POST /api/v1/auth/verify-email
-
-Verifica la dirección de email del usuario usando el token enviado al registrarse.
-
-**Request body:**
-
-```json
-{
-  "token": "550e8400-e29b-41d4-a716-446655440000"
-}
-```
-
-**Respuesta exitosa (200 OK):**
-
-```json
-{
-  "message": "Email verificado exitosamente. Ya puedes iniciar sesión."
-}
-```
-
-> Tras la verificación exitosa, el campo `is_email_verified` del usuario pasa a `true` y puede hacer login.
-
-El enlace del email de verificación tiene este formato:
-
-```
-{FRONTEND_URL}/verify-email?token=<uuid-token>
-```
-
-El token expira en **24 horas**.
-
-**Errores posibles:**
-
-| Código | Condición                                  |
-| ------ | ------------------------------------------ |
-| 400    | Token inválido, expirado (>24h) o ya usado |
+| 400    | Nueva contraseña no cumple requisitos de fortaleza |
 
 ---
 
@@ -359,27 +318,31 @@ Retorna el perfil del usuario autenticado actualmente.
 
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "_id": "507f1f77bcf86cd799439011",
   "email": "usuario@ejemplo.com",
-  "full_name": "Juan Pérez",
-  "is_active": true,
-  "is_email_verified": true,
-  "created_at": "2026-02-15T10:30:00+00:00",
-  "updated_at": "2026-02-15T10:30:00+00:00"
+  "firstName": "Juan",
+  "lastName": "Pérez",
+  "isActive": true,
+  "isEmailVerified": true,
+  "locale": "es",
+  "createdAt": "2026-04-22T10:30:00.000Z",
+  "updatedAt": "2026-04-22T10:30:00.000Z"
 }
 ```
 
-| Campo               | Tipo             | Descripción                     |
-| ------------------- | ---------------- | ------------------------------- |
-| `id`                | string (UUID)    | Identificador único del usuario |
-| `email`             | string           | Email del usuario               |
-| `full_name`         | string           | Nombre completo                 |
-| `is_active`         | boolean          | Si la cuenta está activa        |
-| `is_email_verified` | boolean          | Si el email fue verificado      |
-| `created_at`        | string (ISO8601) | Fecha de registro               |
-| `updated_at`        | string (ISO8601) | Fecha de última actualización   |
+| Campo             | Tipo             | Descripción                     |
+| ----------------- | ---------------- | ------------------------------- |
+| `_id`             | string (ObjectId)| Identificador único MongoDB      |
+| `email`           | string           | Email del usuario               |
+| `firstName`       | string           | Nombre                          |
+| `lastName`        | string           | Apellido                        |
+| `isActive`        | boolean          | Si la cuenta está activa        |
+| `isEmailVerified` | boolean          | Si el email fue verificado      |
+| `locale`          | string           | Idioma preferido (`es` / `en`)  |
+| `createdAt`       | string (ISO8601) | Fecha de registro               |
+| `updatedAt`       | string (ISO8601) | Fecha de última actualización   |
 
-> **Nota**: El campo `hashed_password` **nunca** aparece en ninguna respuesta de la API. El schema `UserResponse` lo excluye explícitamente mediante el response model de FastAPI.
+> **Nota de seguridad**: El campo `hashedPassword` **nunca** aparece en ninguna respuesta de la API. El schema Mongoose excluye explícitamente ese campo usando `select: false`.
 
 **Errores posibles:**
 
@@ -391,7 +354,7 @@ Retorna el perfil del usuario autenticado actualmente.
 
 ## Rate Limiting — Detalles Técnicos
 
-El rate limiting está implementado con [slowapi](https://github.com/laurentS/slowapi) (puerto de Flask-Limiter para FastAPI), usando la IP del cliente como identificador.
+El rate limiting está implementado con [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit), usando la IP del cliente como identificador.
 
 | Endpoint                     | Límite | Razón                                      |
 | ---------------------------- | ------ | ------------------------------------------ |
@@ -403,33 +366,20 @@ El rate limiting está implementado con [slowapi](https://github.com/laurentS/sl
 
 ```json
 {
-  "error": "Rate limit exceeded: 10 per 1 minute"
+  "error": "Demasiados intentos. Espera un minuto."
 }
 ```
 
 ---
 
-## Seguridad de la Documentación
-
-En **producción** (`ENVIRONMENT=production`), las rutas `/docs` y `/redoc` están **deshabilitadas** — devuelven 404. Esta es una medida de seguridad (OWASP A05) para evitar exponer la superficie de ataque de la API públicamente.
-
-En **desarrollo** (`ENVIRONMENT=development`, valor por defecto), Swagger UI está disponible en:
-
-- `http://localhost:8000/docs` — Swagger UI (interactivo)
-- `http://localhost:8000/redoc` — ReDoc (solo lectura)
-
----
-
 ## Flujos de Uso — Ejemplos Paso a Paso
 
-### Flujo completo de registro y verificación
+### Flujo completo de registro
 
 ```
-1. POST /api/v1/auth/register → 201 (is_email_verified: false)
-2. (Revisar bandeja de entrada — llega email con enlace de verificación)
-3. POST /api/v1/auth/verify-email { token } → 200
-4. POST /api/v1/auth/login { email, password } → 200 (access_token, refresh_token)
-5. GET /api/v1/users/me con Bearer token → 200 (perfil completo)
+1. POST /api/v1/auth/register → 201 (cuenta creada)
+2. POST /api/v1/auth/login { email, password } → 200 (access_token, refresh_token)
+3. GET /api/v1/users/me con Bearer token → 200 (perfil completo)
 ```
 
 ### Flujo de renovación de sesión
@@ -447,6 +397,6 @@ En **desarrollo** (`ENVIRONMENT=development`, valor por defecto), Swagger UI est
 1. POST /api/v1/auth/forgot-password { email } → 200 (siempre)
 2. (El usuario hace clic en el enlace del email)
    Frontend captura: /reset-password?token=<uuid>
-3. POST /api/v1/auth/reset-password { token, new_password } → 200
-4. POST /api/v1/auth/login { email, new_password } → 200 (nuevos tokens)
+3. POST /api/v1/auth/reset-password { token, newPassword } → 200
+4. POST /api/v1/auth/login { email, newPassword } → 200 (nuevos tokens)
 ```
