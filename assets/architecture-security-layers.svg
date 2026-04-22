@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 400" width="620" height="400" font-family="system-ui,-apple-system,sans-serif">
+  <defs>
+    <style>
+      .num { font-size: 13px; font-weight: 700; }
+      .lbl { font-size: 12px; font-weight: 600; }
+      .sub { font-size: 11px; }
+    </style>
+  </defs>
+
+  <!-- Fondo -->
+  <rect width="620" height="400" fill="#0f172a" rx="12"/>
+  <text x="310" y="28" text-anchor="middle" font-size="14" font-weight="700" fill="#f1f5f9">Capas de Seguridad — Express.js Backend</text>
+  <text x="310" y="46" text-anchor="middle" font-size="11" fill="#64748b">de afuera (red) hacia adentro (datos)</text>
+
+  <!-- Capa 1 -->
+  <rect x="20" y="58" width="580" height="34" fill="#1e3a5f" rx="6"/>
+  <text x="44" y="80" class="num" fill="#38bdf8">1</text>
+  <text x="64" y="80" class="lbl" fill="#7dd3fc">CORS Middleware</text>
+  <text x="64" y="80" class="sub" fill="#94a3b8" dx="155"> → solo permite origin: FRONTEND_URL (no "*")</text>
+
+  <!-- Capa 2 -->
+  <rect x="36" y="100" width="548" height="34" fill="#1e3a5f" rx="6" opacity="0.9"/>
+  <text x="60" y="122" class="num" fill="#38bdf8">2</text>
+  <text x="80" y="122" class="lbl" fill="#7dd3fc">helmet</text>
+  <text x="80" y="122" class="sub" fill="#94a3b8" dx="52"> → X-Frame-Options · X-Content-Type-Options · Referrer-Policy</text>
+
+  <!-- Capa 3 -->
+  <rect x="52" y="142" width="516" height="34" fill="#1e3a5f" rx="6" opacity="0.85"/>
+  <text x="76" y="164" class="num" fill="#38bdf8">3</text>
+  <text x="96" y="164" class="lbl" fill="#7dd3fc">express-rate-limit</text>
+  <text x="96" y="164" class="sub" fill="#94a3b8" dx="135"> → por IP · 10/min login · 5/min register · 429 si supera</text>
+
+  <!-- Capa 4 -->
+  <rect x="68" y="184" width="484" height="34" fill="#1e3a5f" rx="6" opacity="0.8"/>
+  <text x="92" y="206" class="num" fill="#38bdf8">4</text>
+  <text x="112" y="206" class="lbl" fill="#7dd3fc">express-validator</text>
+  <text x="112" y="206" class="sub" fill="#94a3b8" dx="133"> → tipos, formato email, fortaleza de contraseña · 400 si falla</text>
+
+  <!-- Capa 5 -->
+  <rect x="84" y="226" width="452" height="34" fill="#1e3a5f" rx="6" opacity="0.75"/>
+  <text x="108" y="248" class="num" fill="#38bdf8">5</text>
+  <text x="128" y="248" class="lbl" fill="#7dd3fc">requireAuth middleware</text>
+  <text x="128" y="248" class="sub" fill="#94a3b8" dx="162"> → verifica JWT · extrae userId del token · 401 si inválido</text>
+
+  <!-- Capa 6 -->
+  <rect x="100" y="268" width="420" height="34" fill="#1e3a5f" rx="6" opacity="0.7"/>
+  <text x="124" y="290" class="num" fill="#38bdf8">6</text>
+  <text x="144" y="290" class="lbl" fill="#7dd3fc">Business Logic (Service)</text>
+  <text x="144" y="290" class="sub" fill="#94a3b8" dx="160"> → verifica isActive · mensajes de error genéricos</text>
+
+  <!-- Capa 7 -->
+  <rect x="116" y="310" width="388" height="34" fill="#1e3a5f" rx="6" opacity="0.65"/>
+  <text x="140" y="332" class="num" fill="#38bdf8">7</text>
+  <text x="160" y="332" class="lbl" fill="#7dd3fc">Mongoose ODM</text>
+  <text x="160" y="332" class="sub" fill="#94a3b8" dx="105"> → queries parametrizadas · no raw queries · no injection</text>
+
+  <!-- Capa 8 -->
+  <rect x="132" y="352" width="356" height="34" fill="#1e3a5f" rx="6" opacity="0.6"/>
+  <text x="156" y="374" class="num" fill="#22c55e">8</text>
+  <text x="176" y="374" class="lbl" fill="#86efac">bcryptjs (datos en reposo)</text>
+  <text x="176" y="374" class="sub" fill="#94a3b8" dx="190"> → contraseñas nunca en texto plano</text>
+
+  <!-- Flecha izquierda -->
+  <line x1="12" y1="70" x2="12" y2="370" stroke="#334155" stroke-width="2"/>
+  <polygon points="12,382 7,368 17,368" fill="#334155"/>
+  <text x="6" y="226" font-size="10" fill="#475569" transform="rotate(-90,6,226)" text-anchor="middle">petición entrante</text>
+</svg>

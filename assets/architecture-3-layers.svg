@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 500" width="760" height="500" font-family="system-ui,-apple-system,sans-serif">
+  <defs>
+    <style>
+      .lt { font-size: 12px; font-weight: 700; fill: #ffffff; }
+      .cl { font-size: 11px; fill: #94a3b8; }
+      .cs { font-size: 10px; fill: #64748b; }
+      .cf { font-size: 10px; fill: #475569; }
+    </style>
+  </defs>
+
+  <!-- Fondo -->
+  <rect width="760" height="500" fill="#0f172a" rx="12"/>
+
+  <!-- ===== CAPA 3: CLIENTE (y=12, h=120) ===== -->
+  <rect x="16" y="12" width="728" height="120" fill="#1e293b" rx="8"/>
+  <rect x="16" y="12" width="728" height="28" fill="#0ea5e9" rx="8"/>
+  <rect x="16" y="32" width="728" height="8" fill="#0ea5e9"/>
+  <text x="380" y="30" text-anchor="middle" class="lt">CAPA 3 — CLIENTE (Navegador) · React 18 + TypeScript + TailwindCSS + React Router · :5173</text>
+
+  <rect x="32" y="52" width="148" height="44" fill="#0f172a" rx="5"/>
+  <text x="106" y="71" text-anchor="middle" class="cl">Pages</text>
+  <text x="106" y="87" text-anchor="middle" class="cs">vistas de la app</text>
+
+  <rect x="196" y="52" width="148" height="44" fill="#0f172a" rx="5"/>
+  <text x="270" y="71" text-anchor="middle" class="cl">Components</text>
+  <text x="270" y="87" text-anchor="middle" class="cs">UI + Layout</text>
+
+  <rect x="360" y="52" width="164" height="44" fill="#0f172a" rx="5"/>
+  <text x="442" y="71" text-anchor="middle" class="cl">Context / Hooks</text>
+  <text x="442" y="87" text-anchor="middle" class="cs">estado de auth</text>
+
+  <rect x="540" y="52" width="188" height="44" fill="#0f172a" rx="5"/>
+  <text x="634" y="71" text-anchor="middle" class="cl">api/auth.ts</text>
+  <text x="634" y="87" text-anchor="middle" class="cs">HTTP + interceptor JWT</text>
+
+  <!-- Conector 1 -->
+  <rect x="16" y="134" width="728" height="20" fill="#082f49" rx="3"/>
+  <text x="380" y="148" text-anchor="middle" style="font-size:11px;fill:#38bdf8;font-weight:600">↕  JSON / HTTPS</text>
+
+  <!-- ===== CAPA 2: SERVIDOR (y=156, h=148) ===== -->
+  <rect x="16" y="156" width="728" height="148" fill="#1e293b" rx="8"/>
+  <rect x="16" y="156" width="728" height="28" fill="#f97316" rx="8"/>
+  <rect x="16" y="176" width="728" height="8" fill="#f97316"/>
+  <text x="380" y="174" text-anchor="middle" class="lt">CAPA 2 — SERVIDOR · Express.js + Node.js 20 · :5000</text>
+
+  <rect x="32" y="196" width="124" height="44" fill="#0f172a" rx="5"/>
+  <text x="94" y="215" text-anchor="middle" class="cl">routes/</text>
+  <text x="94" y="231" text-anchor="middle" class="cs">endpoints HTTP</text>
+
+  <rect x="168" y="196" width="124" height="44" fill="#0f172a" rx="5"/>
+  <text x="230" y="215" text-anchor="middle" class="cl">controllers/</text>
+  <text x="230" y="231" text-anchor="middle" class="cs">req / res</text>
+
+  <rect x="304" y="196" width="124" height="44" fill="#0f172a" rx="5"/>
+  <text x="366" y="215" text-anchor="middle" class="cl">services/</text>
+  <text x="366" y="231" text-anchor="middle" class="cs">lógica de negocio</text>
+
+  <rect x="440" y="196" width="124" height="44" fill="#0f172a" rx="5"/>
+  <text x="502" y="215" text-anchor="middle" class="cl">middleware/</text>
+  <text x="502" y="231" text-anchor="middle" class="cs">auth · validate</text>
+
+  <rect x="576" y="196" width="152" height="44" fill="#0f172a" rx="5"/>
+  <text x="652" y="215" text-anchor="middle" class="cl">utils/ + models/</text>
+  <text x="652" y="231" text-anchor="middle" class="cs">security · email · ODM</text>
+
+  <!-- Barra de dependencias -->
+  <rect x="32" y="256" width="696" height="32" fill="#0f172a" rx="5"/>
+  <text x="380" y="276" text-anchor="middle" class="cs">express-rate-limit · helmet · morgan · bcryptjs · jsonwebtoken · express-validator · Mongoose ODM</text>
+
+  <!-- Conector 2 -->
+  <rect x="16" y="306" width="728" height="20" fill="#052e16" rx="3"/>
+  <text x="380" y="320" text-anchor="middle" style="font-size:11px;fill:#4ade80;font-weight:600">↕  MongoDB Wire Protocol  (port 27017)</text>
+
+  <!-- ===== CAPA 1: DATOS (y=328, h=148) ===== -->
+  <rect x="16" y="328" width="728" height="148" fill="#1e293b" rx="8"/>
+  <rect x="16" y="328" width="728" height="28" fill="#22c55e" rx="8"/>
+  <rect x="16" y="348" width="728" height="8" fill="#22c55e"/>
+  <text x="380" y="346" text-anchor="middle" class="lt">CAPA 1 — DATOS · MongoDB 7 (Docker) · localhost:27017</text>
+
+  <rect x="48" y="368" width="208" height="72" fill="#0f172a" rx="5"/>
+  <text x="152" y="389" text-anchor="middle" class="cl">Colección: users</text>
+  <text x="152" y="407" text-anchor="middle" class="cs">email · hashedPassword</text>
+  <text x="152" y="423" text-anchor="middle" class="cs">firstName · lastName · locale</text>
+
+  <rect x="276" y="368" width="228" height="72" fill="#0f172a" rx="5"/>
+  <text x="390" y="389" text-anchor="middle" class="cl">Colección: passwordresettokens</text>
+  <text x="390" y="407" text-anchor="middle" class="cs">userId · token · expiresAt · used</text>
+  <text x="390" y="423" text-anchor="middle" class="cs">TTL: 1 hora</text>
+
+  <rect x="524" y="368" width="204" height="72" fill="#0f172a" rx="5" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="626" y="389" text-anchor="middle" class="cl">Mailpit (dev only)</text>
+  <text x="626" y="407" text-anchor="middle" class="cs">SMTP :1025 · UI :8025</text>
+  <text x="626" y="423" text-anchor="middle" class="cs">captura emails locales</text>
+
+  <!-- Leyenda -->
+  <rect x="48" y="454" width="14" height="12" fill="none" rx="2" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <text x="68" y="464" class="cf">= servicio externo (no código del proyecto)</text>
+
+  <!-- Pie -->
+  <text x="380" y="492" text-anchor="middle" class="cf">NN Auth System · MERN Stack · Arquitectura de 3 Capas</text>
+</svg>

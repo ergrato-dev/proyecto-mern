@@ -9,9 +9,8 @@
              Este documento reduce significativamente el tiempo de onboarding.
 -->
 
-> **Proyecto**: NN Auth System 
-> **Stack**: FastAPI (Python 3.12) + React (TypeScript) + PostgreSQL 17 + Docker
-> **Tests**: 38/38 backend · 136/136 frontend
+> **Proyecto**: NN Auth System
+> **Stack**: Express.js (Node.js 20) + React (TypeScript) + MongoDB 7 + Docker
 
 ---
 
@@ -20,54 +19,7 @@
 El sistema sigue una **arquitectura Cliente–Servidor de 3 capas**, donde cada capa tiene
 una responsabilidad única y se comunica solo con la capa adyacente:
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  CAPA 3 — CLIENTE (Navegador Web)                                │
-│                                                                  │
-│  React 18 + TypeScript + TailwindCSS + React Router              │
-│  http://localhost:5173                                           │
-│                                                                  │
-│  ┌─────────────┐  ┌─────────────────┐  ┌──────────────────────┐ │
-│  │   Pages     │  │   Components    │  │  Context / Hooks     │ │
-│  │  (vistas)   │  │  (UI + Layout)  │  │  (estado de auth)    │ │
-│  └──────┬──────┘  └────────┬────────┘  └──────────────────────┘ │
-│         │                  │                                     │
-│         └──────────────────┤                                     │
-│                            ▼                                     │
-│  ┌───────────────────────────────────┐                           │
-│  │   api/auth.ts + api/axios.ts      │  (HTTP + JWT)             │
-│  └───────────────────────────────────┘                           │
-└──────────────────────────────────────████████████████████────────┘
-                                        ↕ JSON / HTTPS
-┌──────────────────────────────────────████████████████████────────┐
-│  CAPA 2 — SERVIDOR (Backend API)                                 │
-│                                                                  │
-│  FastAPI + Uvicorn (ASGI)                                        │
-│  http://localhost:8000                                           │
-│                                                                  │
-│  ┌────────────┐   ┌─────────────┐   ┌────────────┐              │
-│  │  Routers   │ → │  Services   │ → │  Utils     │              │
-│  │ (endpoints)│   │  (lógica)   │   │ (sec/email)│              │
-│  └────────────┘   └─────────────┘   └────────────┘              │
-│         │                 │                 │                    │
-│         ▼                 ▼                 ▼                    │
-│  ┌───────────────────────────────────────────────┐               │
-│  │  Schemas (Pydantic) + Models (SQLAlchemy ORM) │               │
-│  └───────────────────────────────────────────────┘               │
-└──────────────────────────────────────████████████████████────────┘
-                                        ↕ SQL (psycopg2)
-┌──────────────────────────────────────████████████████████────────┐
-│  CAPA 1 — DATOS (Base de Datos)                                  │
-│                                                                  │
-│  PostgreSQL 17 (Docker Container)                                │
-│  localhost:5432                                                  │
-│                                                                  │
-│  ┌──────┐  ┌──────────────────────┐  ┌─────────────────────┐    │
-│  │users │  │password_reset_tokens │  │email_verification_  │    │
-│  │      │  │                      │  │tokens               │    │
-│  └──────┘  └──────────────────────┘  └─────────────────────┘    │
-└──────────────────────────────────────────────────────────────────┘
-```
+![Arquitectura de 3 capas — MERN Stack](../../assets/architecture-3-layers.svg)
 
 ---
 
@@ -76,83 +28,69 @@ una responsabilidad única y se comunica solo con la capa adyacente:
 ### Estructura de capas
 
 ```
-be/app/
+be/src/
 │
-├── main.py          ← Punto de entrada: FastAPI app, CORS, middleware, routers
-├── config.py        ← Variables de entorno con Pydantic Settings
-├── database.py      ← Engine + Session de SQLAlchemy
-├── dependencies.py  ← Dependencias inyectables: get_db(), get_current_user()
+├── index.ts         ← Punto de entrada: arranca el servidor HTTP
+├── app.ts           ← Express app: middleware global, CORS, helmet, morgan, routers
 │
-├── routers/         ← CAPA DE PRESENTACIÓN (HTTP)
-│   ├── auth.py      ← POST /register, /login, /refresh, /change-password,
-│   │                   /forgot-password, /reset-password, /verify-email
-│   └── users.py     ← GET /me
+├── config/          ← CONFIGURACIÓN
+│   └── env.ts       ← Variables de entorno validadas con envalid (falla si faltan)
+│
+├── db/              ← BASE DE DATOS
+│   └── connection.ts ← Conexión Mongoose a MongoDB
+│
+├── routes/          ← CAPA DE PRESENTACIÓN (HTTP)
+│   ├── auth.routes.ts  ← POST /register, /login, /refresh, /change-password,
+│   │                      /forgot-password, /reset-password
+│   └── users.routes.ts ← GET /me
+│
+├── controllers/     ← MANEJADORES HTTP (req → service → res)
+│   ├── auth.controller.ts
+│   └── users.controller.ts
 │
 ├── services/        ← CAPA DE LÓGICA DE NEGOCIO
-│   └── auth_service.py  ← register_user, login_user, refresh_access_token,
-│                            change_password, request_password_reset,
-│                            reset_password, verify_email
+│   └── auth.service.ts  ← register, login, refreshToken, changePassword,
+│                           forgotPassword, resetPassword
 │
-├── models/          ← CAPA DE DATOS (ORM)
-│   ├── user.py      ← Tabla users
-│   ├── password_reset_token.py   ← Tabla password_reset_tokens
-│   └── email_verification_token.py ← Tabla email_verification_tokens
+├── middleware/      ← MIDDLEWARE DE EXPRESS
+│   ├── auth.middleware.ts     ← requireAuth: verifica JWT, adjunta user al req
+│   └── validate.middleware.ts ← ejecuta reglas de express-validator → 400 si falla
 │
-├── schemas/         ← VALIDACIÓN (Pydantic)
-│   └── user.py      ← UserCreate, UserLogin, UserResponse, TokenResponse,
-│                       ChangePasswordRequest, ForgotPasswordRequest,
-│                       ResetPasswordRequest, VerifyEmailRequest, MessageResponse
+├── models/          ← CAPA DE DATOS (Mongoose)
+│   ├── User.ts                ← Schema + interfaz IUser
+│   └── PasswordResetToken.ts  ← Schema + interfaz IPasswordResetToken
 │
 └── utils/           ← UTILIDADES TRANSVERSALES
-    ├── security.py  ← hash_password, verify_password, create_access_token,
-    │                   create_refresh_token, decode_token
-    ├── email.py     ← send_verification_email, send_password_reset_email
-    ├── limiter.py   ← Instancia de SlowAPI (rate limiter)
-    └── audit_log.py ← log_login_success/failed, log_password_changed, etc.
+    ├── security.ts  ← hashPassword, verifyPassword, signToken, verifyToken
+    └── email.ts     ← sendPasswordResetEmail (nodemailer + Mailpit)
 ```
 
 ### Flujo de una petición HTTP
 
 ```
-1. Cliente envía:   POST /api/v1/auth/login { email, password }
-                    ↓
-2. FastAPI valida   El schema `UserLogin` (Pydantic) valida email y password
-   el body:         Si hay errores de validación → 422 automático
-                    ↓
-3. Rate limiting:   @limiter.limit("10/minute") verifica si la IP superó el límite
-                    Si sí → 429 Too Many Requests
-                    ↓
-4. Router:          routers/auth.py::login() recibe los datos validados
-                    Llama a auth_service.login_user(db, login_data)
-                    ↓
-5. Service:         auth_service.login_user():
-                    - Busca user por email (db.query(User).filter(email=...))
-                    - Verifica password: verify_password(plain, hashed)
-                    - Verifica is_email_verified y is_active
-                    - Genera access_token y refresh_token
-                    - Llama a audit_log.log_login_success(...)
-                    ↓
-6. Response:        Router retorna TokenResponse(access_token, refresh_token, token_type)
-                    FastAPI serializa a JSON con el response_model
+1. Cliente envía:     POST /api/v1/auth/login { email, password }
+                      ↓
+2. express-rate-limit: verifica si la IP superó 10/min
+                      Si sí → 429 Too Many Requests
+                      ↓
+3. validate middleware: express-validator comprueba email y password
+                      Si falla → 400 Bad Request con detalle de errores
+                      ↓
+4. Controller:         auth.controller.ts::login() delega al service
+                      ↓
+5. Service:            auth.service.ts::login():
+                      - User.findOne({ email })
+                      - bcrypt.compare(password, user.hashedPassword)
+                      - verifica isActive
+                      - jwt.sign() → accessToken + refreshToken
+                      - logSecurityEvent('login_success', ...)
+                      ↓
+6. Response:           { accessToken, refreshToken, tokenType: 'bearer' }
 ```
 
 ### Seguridad en el backend
 
-```
-┌────────────────────────────────────────────────────────────┐
-│  Capas de seguridad (de afuera hacia adentro)              │
-│                                                            │
-│  1. CORS Middleware          → Solo FRONTEND_URL           │
-│  2. Security Headers         → X-Frame-Options, nosniff   │
-│  3. Rate Limiter (slowapi)   → Por IP, por endpoint        │
-│  4. Pydantic Validation      → Tipos, formato, fortaleza   │
-│  5. JWT Verification         → get_current_user dependency │
-│  6. Business Logic Checks    → is_active, is_email_verified│
-│  7. SQLAlchemy ORM           → No raw SQL, no injection    │
-│  8. bcrypt Hashing           → Contraseñas nunca en plano  │
-│  9. Audit Logging            → Trazabilidad de eventos     │
-└────────────────────────────────────────────────────────────┘
-```
+![Capas de seguridad — Express.js backend](../../assets/architecture-security-layers.svg)
 
 ---
 
@@ -166,36 +104,46 @@ fe/src/
 ├── main.tsx         ← Punto de entrada: renderiza <App /> en el DOM
 ├── App.tsx          ← Rutas de la aplicación (React Router)
 ├── index.css        ← Estilos globales + imports de TailwindCSS
+├── i18n.ts          ← Configuración de i18next (ES + EN)
 │
 ├── context/         ← ESTADO GLOBAL
-│   ├── AuthContext.tsx     ← Provider: usuario actual, tokens, loading
-│   └── authContextDef.ts   ← Definición de tipos del contexto
+│   └── AuthContext.tsx ← Provider: usuario actual, tokens, loading + hook useAuth
 │
 ├── hooks/           ← LÓGICA REUTILIZABLE
 │   └── useAuth.ts   ← Acceso al contexto de auth desde cualquier componente
 │
 ├── api/             ← COMUNICACIÓN HTTP
-│   ├── auth.ts      ← Funciones: register, login, refresh, changePassword, etc.
-│   └── axios.ts     ← Instancia de Axios con interceptores JWT automáticos
+│   └── auth.ts      ← register, login, refresh, changePassword, forgotPassword,
+│                      resetPassword + instancia Axios con interceptores JWT
 │
 ├── components/      ← COMPONENTES REUTILIZABLES
 │   ├── ProtectedRoute.tsx  ← Guarda de rutas autenticadas
 │   ├── layout/
-│   │   ├── AuthLayout.tsx  ← <main> landmark para páginas de auth
-│   │   └── Navbar.tsx      ← Barra de navegación con tema y logout
+│   │   ├── AuthLayout.tsx      ← <main> landmark para páginas de auth
+│   │   ├── Navbar.tsx          ← Barra de navegación, theme toggle, language switcher
+│   │   └── LegalLayout.tsx     ← Layout compartido para páginas legales
 │   └── ui/
-│       ├── Button.tsx      ← Botón con estado loading (aria-busy)
-│       ├── InputField.tsx  ← Input con label, ícono, validación y a11y
-│       └── Alert.tsx       ← Mensajes de éxito/error/info
+│       ├── Button.tsx          ← Botón con estado loading (aria-busy)
+│       ├── InputField.tsx      ← Input con label, validación y a11y
+│       ├── Alert.tsx           ← Mensajes de éxito/error/info
+│       └── LanguageSwitcher.tsx ← Toggle ES/EN (aria-pressed)
 │
 ├── pages/           ← VISTAS (una por ruta)
+│   ├── LandingPage.tsx
 │   ├── LoginPage.tsx
 │   ├── RegisterPage.tsx
 │   ├── DashboardPage.tsx
 │   ├── ChangePasswordPage.tsx
 │   ├── ForgotPasswordPage.tsx
 │   ├── ResetPasswordPage.tsx
-│   └── DataTableDemoPage.tsx
+│   ├── ContactPage.tsx
+│   ├── TerminosDeUsoPage.tsx
+│   ├── PoliticaPrivacidadPage.tsx
+│   └── PoliticaCookiesPage.tsx
+│
+├── locales/         ← TRADUCCIONES (i18n)
+│   ├── es/translation.json
+│   └── en/translation.json
 │
 └── types/           ← TIPOS TYPESCRIPT
     └── auth.ts      ← LoginRequest, RegisterRequest, UserResponse, TokenResponse, etc.
@@ -204,15 +152,17 @@ fe/src/
 ### Rutas de la aplicación
 
 ```
-/                → Redirige a /login o /dashboard (según auth)
-/login           → LoginPage (pública)
-/register        → RegisterPage (pública)
-/forgot-password → ForgotPasswordPage (pública)
-/reset-password  → ResetPasswordPage (pública, requiere ?token=...)
-/verify-email    → (manejado con ?token=...) → llama al backend
-/dashboard       → DashboardPage (PROTEGIDA — requiere auth)
-/change-password → ChangePasswordPage (PROTEGIDA — requiere auth)
-/demo/datatable  → DataTableDemoPage (PROTEGIDA — requiere auth)
+/                   → LandingPage (pública)
+/login              → LoginPage (pública)
+/register           → RegisterPage (pública)
+/forgot-password    → ForgotPasswordPage (pública)
+/reset-password     → ResetPasswordPage (pública, requiere ?token=...)
+/contacto           → ContactPage (pública)
+/terminos-de-uso    → TerminosDeUsoPage (pública)
+/privacidad         → PoliticaPrivacidadPage (pública)
+/cookies            → PoliticaCookiesPage (pública)
+/dashboard          → DashboardPage (PROTEGIDA — requiere auth)
+/change-password    → ChangePasswordPage (PROTEGIDA — requiere auth)
 ```
 
 ### Flujo de autenticación en el frontend
@@ -247,43 +197,28 @@ Expiración del access_token (15 min):
 
 ## Flujos de Autenticación de Extremo a Extremo
 
-### Flujo 1 — Registro y Verificación de Email
+### Flujo 1 — Registro
 
 ```
-Usuario                  Frontend (React)            Backend (FastAPI)         Email (Resend)
-   │                           │                             │                      │
-   │ Rellena formulario        │                             │                      │
-   │ ─────────────────────────►│                             │                      │
-   │                           │ POST /auth/register         │                      │
-   │                           │────────────────────────────►│                      │
-   │                           │                             │ 1. Valida Pydantic   │
-   │                           │                             │ 2. Verifica email ∄  │
-   │                           │                             │ 3. Hash bcrypt       │
-   │                           │                             │ 4. Crea User (is_email_verified=false)
-   │                           │                             │ 5. Crea EmailVerificationToken
-   │                           │                             │ 6. send_verification_email()
-   │                           │                             │─────────────────────►│
-   │                           │◄────────────────────────────│                      │
-   │ Ve mensaje "Verifica email"│  201 UserResponse           │  Envía email con token
-   │◄──────────────────────────│                             │                      │
-   │                           │                             │                      │
-   │ Hace clic en el enlace    │                             │                      │
-   │ ─────────────────────────►│                             │                      │
-   │                           │ POST /auth/verify-email     │                      │
-   │                           │────────────────────────────►│                      │
-   │                           │                             │ 1. Busca token en BD │
-   │                           │                             │ 2. Verifica no expirado
-   │                           │                             │ 3. Marca used=true   │
-   │                           │                             │ 4. is_email_verified=true
-   │                           │◄────────────────────────────│                      │
-   │ "Verificado, ya puedes login"  200 MessageResponse       │                      │
-   │◄──────────────────────────│                             │                      │
+Usuario                  Frontend (React)            Backend (Express)
+   │                           │                             │
+   │ Rellena formulario        │                             │
+   │ ─────────────────────────►│                             │
+   │                           │ POST /auth/register         │
+   │                           │────────────────────────────►│
+   │                           │                             │ 1. express-validator
+   │                           │                             │ 2. Verifica email ∄
+   │                           │                             │ 3. bcrypt.hash()
+   │                           │                             │ 4. User.create()
+   │                           │◄────────────────────────────│
+   │ Ve mensaje de éxito        │  201 UserResponse           │
+   │◄──────────────────────────│                             │
 ```
 
 ### Flujo 2 — Login y Acceso a Dashboard
 
 ```
-Usuario           Frontend                Backend               PostgreSQL
+Usuario           Frontend                Backend               MongoDB
    │                 │                       │                       │
    │ email+password  │                       │                       │
    │────────────────►│                       │                       │
@@ -312,7 +247,7 @@ Usuario           Frontend                Backend               PostgreSQL
 ### Flujo 3 — Recuperación de Contraseña
 
 ```
-Usuario           Frontend                Backend               PostgreSQL    Email
+Usuario           Frontend                Backend               MongoDB       Email
    │                 │                       │                       │           │
    │ Ingresa email   │                       │                       │           │
    │────────────────►│ POST /auth/forgot-password                    │           │
@@ -340,17 +275,18 @@ Usuario           Frontend                Backend               PostgreSQL    Em
 
 ## Decisiones Técnicas Clave
 
-### ¿Por qué FastAPI y no Django o Flask?
+### ¿Por qué Express.js y no NestJS o Fastify?
 
-| Criterio             | FastAPI                | Flask        | Django               |
-| -------------------- | ---------------------- | ------------ | -------------------- |
-| Velocidad            | ⚡ Ultra rápido (ASGI) | Medio (WSGI) | Medio (WSGI)         |
-| Tipado               | ✅ Nativo (Pydantic)   | ❌ Manual    | ⚠️ Parcial           |
-| Validación           | ✅ Automática          | ❌ Manual    | ✅ Forms/Serializers |
-| Documentación        | ✅ Swagger auto        | ❌ Manual    | ❌ Manual (o DRF)    |
-| Curva de aprendizaje | Baja                   | Muy baja     | Alta                 |
+| Criterio             | Express.js                | NestJS              | Fastify                 |
+| -------------------- | ------------------------- | ------------------- | ----------------------- |
+| Madurez              | ✅ El más maduro (2010)   | Reciente (2017)     | Reciente (2016)         |
+| Curva de aprendizaje | Muy baja                  | Alta (decoradores)  | Media                   |
+| Flexibilidad         | ✅ Máxima                 | ⚠️ Opinionado       | ✅ Alta                  |
+| TypeScript           | ✅ Soportado con @types   | ✅ Nativo            | ✅ Soportado             |
+| Ecosistema npm       | ✅ El mayor               | ✅ Grande            | ✅ Grande                |
+| Para aprendizaje     | ✅ Ideal                  | ❌ Complejo          | ✅ Bueno                 |
 
-FastAPI fue elegido por su soporte nativo de tipos Python, validación automática con Pydantic y documentación Swagger auto-generada.
+Express.js fue elegido por ser el estándar de la industria para Node.js: mínimo, explica cada concepto manualmente y tiene el ecosistema más amplio.
 
 ### ¿Por qué JWT stateless y no sesiones en servidor?
 
@@ -380,11 +316,12 @@ Este es un proyecto de **SPA (Single Page Application)** — toda la navegación
 
 | Variable          | Desarrollo                   | Producción                                     |
 | ----------------- | ---------------------------- | ---------------------------------------------- |
-| `ENVIRONMENT`     | `development`                | `production`                                   |
-| `/docs` (Swagger) | ✅ Disponible                | ❌ Deshabilitado (404)                         |
-| `DATABASE_URL`    | `localhost:5432`             | Servidor de BD en cloud                        |
+| `NODE_ENV`        | `development`                | `production`                                   |
+| `/api/v1/`        | ✅ Disponible                | ✅ Disponible                                  |
+| `MONGODB_URI`     | `mongodb://localhost:27017/` | Cluster MongoDB Atlas o servidor propio        |
 | `FRONTEND_URL`    | `http://localhost:5173`      | `https://tu-dominio.com`                       |
-| `SECRET_KEY`      | Clave de desarrollo (≥32 ch) | Clave aleatoria larga (`openssl rand -hex 64`) |
-| `RESEND_API_KEY`  | Vacío (logs en consola)      | API key de Resend.com                          |
+| `JWT_SECRET`      | Clave de desarrollo (≥32 ch) | Clave aleatoria larga (`openssl rand -hex 64`) |
+| `MAIL_HOST`       | `localhost`                  | Servidor SMTP de producción                    |
+| `MAIL_PORT`       | `1025` (Mailpit)             | `587` (STARTTLS) o `465` (SSL)                 |
 
 > Ver [be/.env.example](../be/.env.example) para la lista completa de variables.
